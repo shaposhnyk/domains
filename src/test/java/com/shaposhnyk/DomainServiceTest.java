@@ -6,7 +6,6 @@
 
 package com.shaposhnyk;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.nio.file.Path;
@@ -127,6 +126,64 @@ public class DomainServiceTest {
   }
 
   @Test
+  public void testFilterBySource() {
+    DomainService domainSrv = new DomainService();
+
+    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com", Paths.get("B"));
+    DomainService.Domain internal =
+        DomainService.Domain.of("internal.acme.com", Paths.get("A"), one);
+    DomainService.Domain acme = DomainService.Domain.of("acme.com", Paths.get("A"), internal);
+
+    List<DomainService.Domain> results =
+        domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(Arrays.asList(acme));
+
+    assertThat(results)
+        .extracting(DomainService.Domain::getDomainName)
+        .containsOnly(acme.getDomainName());
+
+    assertThat(results.get(0).getSubDomains())
+        .extracting(DomainService.Domain::getDomainName)
+        .doesNotContain(internal.getDomainName()) // filtered out
+        .containsOnly(one.getDomainName());
+  }
+
+  @Test
+  public void testFilterBySource2() {
+    DomainService domainSrv = new DomainService();
+
+    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com", Paths.get("A"));
+    DomainService.Domain internal =
+        DomainService.Domain.of("internal.acme.com", Paths.get("B"), one);
+    DomainService.Domain acme = DomainService.Domain.of("acme.com", Paths.get("A"), internal);
+
+    List<DomainService.Domain> results =
+        domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(Arrays.asList(acme));
+
+    assertThat(results)
+        .extracting(DomainService.Domain::getDomainName)
+        .containsOnly(acme.getDomainName());
+
+    assertThat(results.get(0).getSubDomains())
+        .extracting(DomainService.Domain::getDomainName)
+        .doesNotContain(one.getDomainName()) // filtered out
+        .containsOnly(internal.getDomainName());
+  }
+
+  @Test
+  public void testSameSourcesFilteredOut() {
+    DomainService domainSrv = new DomainService();
+
+    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com", Paths.get("A"));
+    DomainService.Domain internal =
+        DomainService.Domain.of("internal.acme.com", Paths.get("A"), one);
+    DomainService.Domain acme = DomainService.Domain.of("acme.com", Paths.get("A"), internal);
+    DomainService.Domain some = DomainService.Domain.of("some.com", Paths.get("B"));
+
+    assertThat(domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(Arrays.asList(acme, some)))
+        .isEmpty();
+  }
+
+  @Test
   public void testSubDomainsAreNormalized() {
     DomainService domainSrv = new DomainService();
     List<DomainService.NamedSource> src =
@@ -150,13 +207,12 @@ public class DomainServiceTest {
   }
 
   @Test
-  @Ignore
   public void testSampleProblem() {
     DomainService domainSrv = new DomainService();
     List<DomainService.NamedSource> src =
         DomainService.NamedSources.sourcesOf("/domains1.txt", "/domains2.txt", "/domains3.txt");
     List<DomainService.Domain> domains =
-        domainSrv.filterDomainsWithDiffSourceSubDomains(domainSrv.domainsWithSubDomains(src));
+        domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(domainSrv.domainsWithSubDomains(src));
 
     assertThat(domains)
         .extracting(DomainService.Domain::getDomainName)
@@ -176,6 +232,12 @@ public class DomainServiceTest {
         .flatExtracting(d -> d.getSubDomains())
         .extracting(DomainService.Domain::getSourceLocation)
         .containsOnly(Paths.get("/domains1.txt"), Paths.get("/domains3.txt"));
+  }
+
+  @Test
+  public void runPrint() {
+    DomainService domainSrv = new DomainService();
+    domainSrv.solveProblem("/domains1.txt", "/domains2.txt", "/domains3.txt");
   }
 
   private List<DomainService.NamedSource> listSourceOf(String... lines) {

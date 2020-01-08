@@ -18,8 +18,30 @@ import static java.util.stream.Collectors.toList;
 
 /** A service allowing to group domains with their sub-domains */
 public class DomainService {
+
+  /** Reads files and prints only domains with subDomains from different sources */
+  public void solveProblem(String... files) {
+    List<NamedSource> sources = NamedSources.sourcesOf(files);
+    List<Domain> topDomains = domainsWithSubDomains(sources);
+    List<Domain> domainsDiffSources = flatMapAndfilterDomainsWithDiffSourceSubDomains(topDomains);
+
+    // we build an arbitrary-level hierarchy
+    // but then in flatMapAndFilter() all subDomains are brought to the second level
+    printWithIdent("", domainsDiffSources, true);
+  }
+
+  private void printWithIdent(String ident, List<Domain> domains, boolean printChildren) {
+    for (Domain d : domains) {
+      Path location = d.getSourceLocation().getFileName();
+      System.out.println(String.format("%s%s (%s)", ident, d.getDomainName(), location));
+      if (printChildren) {
+        printWithIdent(ident + "  ", d.getSubDomains(), false);
+      }
+    }
+  }
+
   /** @return filters out domains which have all their sub-domains in the same source */
-  public List<Domain> filterDomainsWithDiffSourceSubDomains(List<Domain> topDomains) {
+  public List<Domain> flatMapAndfilterDomainsWithDiffSourceSubDomains(List<Domain> topDomains) {
     return topDomains.stream()
         .flatMap(DomainService::domainWithSubDomainsIfHasDifferentSources)
         .collect(toList());
@@ -225,6 +247,10 @@ public class DomainService {
      *
      * @return domain (from a location) with sub-domains
      */
+    public static Domain of(String domainName, Path path, Domain... subDomains) {
+      return of(domainName, path, Arrays.asList(subDomains));
+    }
+
     public static Domain of(String domainName, Path path, Collection<Domain> subDomains) {
       // if we aim to support IDN's, then probably usage of toLowerCase() should be
       // reconsidered
@@ -241,6 +267,7 @@ public class DomainService {
     }
 
     public List<Domain> getSubDomains() {
+      // it would be good to retourn here Collections.unmodifiableList(), if possible
       return subDomains;
     }
 
