@@ -55,7 +55,7 @@ public class DomainService {
    * @return group all domains with theirs sub-domains
    */
   public List<Domain> domainsWithSubDomains(List<NamedSource> sources) {
-    List<Domain> topDomains = new ArrayList<>();
+    DomainList topDomains = new DomainList();
 
     for (NamedSource source : sources) {
       source
@@ -67,7 +67,7 @@ public class DomainService {
           .forEach(currentDomain -> mergeDomain(topDomains, currentDomain));
     }
 
-    return topDomains;
+    return topDomains.getDomains();
   }
 
   /**
@@ -99,7 +99,119 @@ public class DomainService {
     return list;
   }
 
-  public List<Domain> mergeDomain(List<Domain> knownDomains, Domain newDomain) {
+  /** A list of domains which optimizes search of sub-domains */
+  public static class DomainList {
+    // perf-wise side, it's better to use HashSet, use LinkedHashSet to preserve insertion order
+    private final Set<Domain> knownDomains = new LinkedHashSet<>(0);
+    private final Map<String, Set<Domain>> domainsBySuffix = new HashMap<>();
+
+    /** Adds new independent domain (i.e. not parent of an existing one, nor a child) to the list */
+    void addDomain(Domain domain) {
+      knownDomains.add(domain);
+
+      String name = domain.getDomainName();
+      addDomainByKey(name, domain);
+      for (int i = 0; i < name.length(); i++) {
+        if (name.charAt(i) == '.') {
+          addDomainByKey(name.substring(i + 1), domain);
+        }
+      }
+    }
+
+    /**
+     * Removes a domain which is already in the list
+     *
+     * @param domain
+     */
+    void removeDomain(Domain domain) {
+      knownDomains.remove(domain);
+      String name = domain.getDomainName();
+      removeDomainByKey(name, domain);
+      for (int i = 0; i < name.length(); i++) {
+        if (name.charAt(i) == '.') {
+          removeDomainByKey(name.substring(i + 1), domain);
+        }
+      }
+    }
+
+    private void addDomainByKey(String name, Domain domain) {
+      Set<Domain> domains = domainsBySuffix.computeIfAbsent(name, key -> new LinkedHashSet<>());
+      domains.add(domain);
+    }
+
+    private void removeDomainByKey(String name, Domain domain) {
+      domainsBySuffix.get(name).remove(domain);
+    }
+
+    /** @return most specific parent for a given domainName */
+    public List<Domain> findParentsOf(String domainName) {
+      String currentName = domainName;
+      int idx = currentName.indexOf(".");
+      while (idx > 0) {
+        currentName = currentName.substring(idx + 1);
+        Set<Domain> potentialParents = domainsBySuffix.get(currentName);
+        if (potentialParents != null) {
+          int length = currentName.length();
+          List<Domain> parents =
+              potentialParents.stream()
+                  .filter(pp -> pp.getDomainName().length() == length)
+                  .collect(toList());
+          if (!parents.isEmpty()) {
+            return parents;
+          }
+        }
+        idx = currentName.indexOf(".");
+      }
+      return Collections.emptyList();
+    }
+
+    public List<Domain> findSubDomains(String domainName) {
+      Set<Domain> domains = domainsBySuffix.get(domainName);
+      return domains == null ? Collections.emptyList() : new ArrayList<>(domains);
+    }
+
+    public List<Domain> getDomains() {
+      return new ArrayList<>(knownDomains);
+    }
+
+    @Override
+    public String toString() {
+      return knownDomains.toString();
+    }
+  }
+
+  /**
+   * Modifies input lists, removing from it all subDomains of a newDomain OR adding newDomain as
+   * subDomain to the one of existing domains
+   */
+  public List<Domain> mergeDomain(DomainList knownDomains, Domain newDomain) {
+    Domain parentDomain =
+        knownDomains.findParentsOf(newDomain.getDomainName()).stream()
+            .findFirst() // there should 1 parent or 0
+            .orElse(null);
+
+    if (parentDomain != null) {
+      // just add newDomain as subDomain of the parent
+      // I use brute force merger, but I should use DomainList for subDomains
+      mergeDomainV0(parentDomain.getSubDomains(), newDomain);
+      return knownDomains.getDomains();
+    }
+
+    List<Domain> subDomains = knownDomains.findSubDomains(newDomain.getDomainName());
+    if (!subDomains.isEmpty()) {
+      subDomains.forEach(knownDomains::removeDomain);
+      subDomains.forEach(subDomain -> mergeDomainV0(newDomain.getSubDomains(), subDomain));
+    }
+
+    knownDomains.addDomain(newDomain);
+    return knownDomains.getDomains();
+  }
+
+  /**
+   * Modifies input lists, removing from it all subDomains of a newDomain OR adding newDomain as
+   * subDomain to the one of existing domains. Brute-foce version of algorithm
+   */
+  public List<Domain> mergeDomainV0(List<Domain> knownDomains, Domain newDomain) {
     // this for-loop will be very inefficient on lange number of domains
     // should be replaced with a more efficient method, like tree-search or hashing
 
@@ -113,8 +225,9 @@ public class DomainService {
         knownDomains.remove(i);
         allSubDomainsOfNewDomain.add(d);
       } else if (newDomain.isSubDomainOf(d)) {
-        mergeDomain(d.getSubDomains(), newDomain);
+        mergeDomainV0(d.getSubDomains(), newDomain);
         matchFound = true;
+        break;
       }
     }
 
@@ -122,7 +235,7 @@ public class DomainService {
       knownDomains.add(newDomain);
     }
     for (Domain subDomain : allSubDomainsOfNewDomain) {
-      mergeDomain(newDomain.getSubDomains(), subDomain);
+      mergeDomainV0(newDomain.getSubDomains(), subDomain);
     }
     return knownDomains;
   }
@@ -293,7 +406,7 @@ public class DomainService {
 
     @Override
     public int hashCode() {
-      return Objects.hash(domainName, sourceLocation, subDomains);
+      return Objects.hash(domainName, sourceLocation);
     }
 
     @Override
