@@ -1,0 +1,5 @@
+mydb.acme.com
+internal.acme.com
+www.acme.com
+someservice-b.internal.acme.com
+external-service-a.acme.com

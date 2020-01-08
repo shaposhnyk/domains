@@ -1,0 +1,6 @@
+external-service-b.acme.com
+portal.acme.com
+portal-1.portal.acme.com
+someservice-c.internal.acme.com
+portal-2.portal.acme.com
+dev.mydb.acme.com

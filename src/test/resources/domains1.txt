@@ -1,0 +1,5 @@
+someservice-a.internal.acme.com
+www.someservice-a.internal.acme.com
+ftp.acme.com
+test-portal.acme.com
+dev-portal.acme.com
