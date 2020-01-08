@@ -21,68 +21,65 @@ public class DomainServiceTest {
   @Test
   public void testDistinctDomains() {
     DomainService domainSrv = new DomainService();
-    List<DomainService.NamedSource> src =
+    List<NamedSource> src =
         listSourceOf("internal.acme.com", "non-internal.acme.com", "", "  ", "\t ");
 
-    List<DomainService.Domain> result = domainSrv.domainsWithSubDomains(src);
+    List<Domain> result = domainSrv.domainsWithSubDomains(src);
     assertThat(result).hasSize(2);
-    assertThat(result).extracting(DomainService.Domain::hasSubDomains).containsOnly(Boolean.FALSE);
+    assertThat(result).extracting(Domain::hasSubDomains).containsOnly(Boolean.FALSE);
   }
 
   @Test
   public void testSubDomains() {
     DomainService domainSrv = new DomainService();
-    List<DomainService.NamedSource> src =
+    List<NamedSource> src =
         listSourceOf("internal.acme.com", "one.internal.acme.com", " two.internal.acme.com");
 
-    List<DomainService.Domain> result = domainSrv.domainsWithSubDomains(src);
+    List<Domain> result = domainSrv.domainsWithSubDomains(src);
     assertThat(result)
         .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("internal.acme.com");
 
     assertThat(result.iterator().next().getSubDomains())
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com", "two.internal.acme.com");
   }
 
   @Test
   public void testSubDomainsBeforeDomain() {
     DomainService domainSrv = new DomainService();
-    List<DomainService.NamedSource> src =
+    List<NamedSource> src =
         listSourceOf("two.internal.acme.com", "one.internal.acme.com", "internal.acme.com");
 
-    List<DomainService.Domain> result = domainSrv.domainsWithSubDomains(src);
+    List<Domain> result = domainSrv.domainsWithSubDomains(src);
     assertThat(result)
         .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("internal.acme.com");
 
     assertThat(result.iterator().next().getSubDomains())
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com", "two.internal.acme.com");
   }
 
   @Test
   public void testSubDomainsBeforeAndAfterDomain() {
     DomainService domainSrv = new DomainService();
-    List<DomainService.NamedSource> src =
+    List<NamedSource> src =
         listSourceOf(
             "two.internal.acme.com", "acme.com", //
             "one.internal.acme.com", "internal.acme.com");
 
-    List<DomainService.Domain> result = domainSrv.domainsWithSubDomains(src);
-    assertThat(result)
-        .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
-        .containsOnly("acme.com");
+    List<Domain> result = domainSrv.domainsWithSubDomains(src);
+    assertThat(result).hasSize(1).extracting(Domain::getDomainName).containsOnly("acme.com");
 
     assertThat(result.iterator().next().getSubDomains())
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("internal.acme.com");
 
     assertThat(result.iterator().next().getSubDomains().iterator().next().getSubDomains())
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com", "two.internal.acme.com");
   }
 
@@ -90,18 +87,18 @@ public class DomainServiceTest {
   public void testMergeSubDomains() {
     DomainService domainSrv = new DomainService();
 
-    DomainService.Domain acme = DomainService.Domain.of("acme.com");
-    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com");
-    DomainService.Domain two = DomainService.Domain.of("two.internal.acme.com");
+    Domain acme = Domain.of("acme.com");
+    Domain one = Domain.of("one.internal.acme.com");
+    Domain two = Domain.of("two.internal.acme.com");
 
-    List<DomainService.Domain> list = new ArrayList<>();
-    list.add(one);
+    DomainList list = new DomainListBruteForce(new ArrayList<>());
+    list.addDomain(one);
 
-    assertThat(domainSrv.mergeDomainV0(list, two)).hasSize(2).containsOnly(one, two);
+    assertThat(domainSrv.mergeDomain(list, two)).hasSize(2).containsOnly(one, two);
 
-    assertThat(domainSrv.mergeDomainV0(list, acme))
+    assertThat(domainSrv.mergeDomain(list, acme))
         .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly(acme.getDomainName());
   }
 
@@ -109,17 +106,17 @@ public class DomainServiceTest {
   public void testMergeSubDomains2() {
     DomainService domainSrv = new DomainService();
 
-    DomainService.Domain acme = DomainService.Domain.of("acme.com");
-    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com");
-    DomainService.Domain two = DomainService.Domain.of("two.internal.acme.com");
-    DomainService.Domain internal = DomainService.Domain.of("internal.acme.com");
+    Domain acme = Domain.of("acme.com");
+    Domain one = Domain.of("one.internal.acme.com");
+    Domain two = Domain.of("two.internal.acme.com");
+    Domain internal = Domain.of("internal.acme.com");
 
     acme.addSubDomain(one);
     acme.addSubDomain(two);
 
-    assertThat(domainSrv.mergeDomainV0(acme.getSubDomains(), internal))
+    assertThat(domainSrv.mergeDomain(new DomainListBruteForce(acme.getSubDomains()), internal))
         .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly(internal.getDomainName());
 
     assertThat(internal.getSubDomains()).containsOnly(one, two);
@@ -129,20 +126,17 @@ public class DomainServiceTest {
   public void testFilterBySource() {
     DomainService domainSrv = new DomainService();
 
-    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com", Paths.get("B"));
-    DomainService.Domain internal =
-        DomainService.Domain.of("internal.acme.com", Paths.get("A"), one);
-    DomainService.Domain acme = DomainService.Domain.of("acme.com", Paths.get("A"), internal);
+    Domain one = Domain.of("one.internal.acme.com", Paths.get("B"));
+    Domain internal = Domain.of("internal.acme.com", Paths.get("A"), one);
+    Domain acme = Domain.of("acme.com", Paths.get("A"), internal);
 
-    List<DomainService.Domain> results =
+    List<Domain> results =
         domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(Arrays.asList(acme));
 
-    assertThat(results)
-        .extracting(DomainService.Domain::getDomainName)
-        .containsOnly(acme.getDomainName());
+    assertThat(results).extracting(Domain::getDomainName).containsOnly(acme.getDomainName());
 
     assertThat(results.get(0).getSubDomains())
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .doesNotContain(internal.getDomainName()) // filtered out
         .containsOnly(one.getDomainName());
   }
@@ -151,20 +145,17 @@ public class DomainServiceTest {
   public void testFilterBySource2() {
     DomainService domainSrv = new DomainService();
 
-    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com", Paths.get("A"));
-    DomainService.Domain internal =
-        DomainService.Domain.of("internal.acme.com", Paths.get("B"), one);
-    DomainService.Domain acme = DomainService.Domain.of("acme.com", Paths.get("A"), internal);
+    Domain one = Domain.of("one.internal.acme.com", Paths.get("A"));
+    Domain internal = Domain.of("internal.acme.com", Paths.get("B"), one);
+    Domain acme = Domain.of("acme.com", Paths.get("A"), internal);
 
-    List<DomainService.Domain> results =
+    List<Domain> results =
         domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(Arrays.asList(acme));
 
-    assertThat(results)
-        .extracting(DomainService.Domain::getDomainName)
-        .containsOnly(acme.getDomainName());
+    assertThat(results).extracting(Domain::getDomainName).containsOnly(acme.getDomainName());
 
     assertThat(results.get(0).getSubDomains())
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .doesNotContain(one.getDomainName()) // filtered out
         .containsOnly(internal.getDomainName());
   }
@@ -173,11 +164,10 @@ public class DomainServiceTest {
   public void testSameSourcesFilteredOut() {
     DomainService domainSrv = new DomainService();
 
-    DomainService.Domain one = DomainService.Domain.of("one.internal.acme.com", Paths.get("A"));
-    DomainService.Domain internal =
-        DomainService.Domain.of("internal.acme.com", Paths.get("A"), one);
-    DomainService.Domain acme = DomainService.Domain.of("acme.com", Paths.get("A"), internal);
-    DomainService.Domain some = DomainService.Domain.of("some.com", Paths.get("B"));
+    Domain one = Domain.of("one.internal.acme.com", Paths.get("A"));
+    Domain internal = Domain.of("internal.acme.com", Paths.get("A"), one);
+    Domain acme = Domain.of("acme.com", Paths.get("A"), internal);
+    Domain some = Domain.of("some.com", Paths.get("B"));
 
     assertThat(domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(Arrays.asList(acme, some)))
         .isEmpty();
@@ -186,7 +176,7 @@ public class DomainServiceTest {
   @Test
   public void testSubDomainsAreNormalized() {
     DomainService domainSrv = new DomainService();
-    List<DomainService.NamedSource> src =
+    List<NamedSource> src =
         listSourceOf(
             "internal.acme.com",
             "One.internal.acme.com",
@@ -194,35 +184,35 @@ public class DomainServiceTest {
             "one.internal.acme.com",
             "one.internal.acme.com   ");
 
-    List<DomainService.Domain> result = domainSrv.domainsWithSubDomains(src);
+    List<Domain> result = domainSrv.domainsWithSubDomains(src);
     assertThat(result)
         .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("internal.acme.com");
 
     assertThat(result.iterator().next().getSubDomains())
         .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com");
   }
 
   @Test
   public void testSampleProblem() {
     DomainService domainSrv = new DomainService();
-    List<DomainService.NamedSource> src =
-        DomainService.NamedSources.sourcesOf("/domains1.txt", "/domains2.txt", "/domains3.txt");
-    List<DomainService.Domain> domains =
+    List<NamedSource> src =
+        NamedSources.sourcesOf("/domains1.txt", "/domains2.txt", "/domains3.txt");
+    List<Domain> domains =
         domainSrv.flatMapAndfilterDomainsWithDiffSourceSubDomains(
             domainSrv.domainsWithSubDomains(src));
 
     assertThat(domains)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("internal.acme.com", "mydb.acme.com");
 
     assertThat(domains)
         .filteredOn(d -> "internal.acme.com".equals(d.getDomainName()))
         .flatExtracting(d -> d.getSubDomains())
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly(
             "someservice-a.internal.acme.com",
             "someservice-c.internal.acme.com",
@@ -231,30 +221,30 @@ public class DomainServiceTest {
     assertThat(domains)
         .filteredOn(d -> "internal.acme.com".equals(d.getDomainName()))
         .flatExtracting(d -> d.getSubDomains())
-        .extracting(DomainService.Domain::getSourceLocation)
+        .extracting(Domain::getSourceLocation)
         .containsOnly(Paths.get("/domains1.txt"), Paths.get("/domains3.txt"));
   }
 
   @Test
   public void testFindSubDomains() {
-    DomainService.DomainList list = new DomainService.DomainList();
-    list.addDomain(DomainService.Domain.of("one.internal.acme.com"));
-    list.addDomain(DomainService.Domain.of("two.internal.acme.com"));
-    list.addDomain(DomainService.Domain.of("some.com"));
+    DomainListMap list = new DomainListMap();
+    list.addDomain(Domain.of("one.internal.acme.com"));
+    list.addDomain(Domain.of("two.internal.acme.com"));
+    list.addDomain(Domain.of("some.com"));
 
     assertThat(list.findSubDomains("acme.com"))
         .hasSize(2)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com", "two.internal.acme.com");
 
     assertThat(list.findSubDomains("internal.acme.com"))
         .hasSize(2)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com", "two.internal.acme.com");
 
     assertThat(list.findSubDomains("one.internal.acme.com"))
         .hasSize(1)
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com");
 
     assertThat(list.findSubDomains("ne.internal.acme.com")).isEmpty();
@@ -263,17 +253,17 @@ public class DomainServiceTest {
 
   @Test
   public void testFindParent() {
-    DomainService.DomainList list = new DomainService.DomainList();
-    list.addDomain(DomainService.Domain.of("one.internal.acme.com"));
-    list.addDomain(DomainService.Domain.of("two.internal.acme.com"));
-    list.addDomain(DomainService.Domain.of("some.com"));
+    DomainListMap list = new DomainListMap();
+    list.addDomain(Domain.of("one.internal.acme.com"));
+    list.addDomain(Domain.of("two.internal.acme.com"));
+    list.addDomain(Domain.of("some.com"));
 
     assertThat(list.findParentsOf("some.one.internal.some.com"))
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("some.com");
 
     assertThat(list.findParentsOf("some.one.internal.acme.com"))
-        .extracting(DomainService.Domain::getDomainName)
+        .extracting(Domain::getDomainName)
         .containsOnly("one.internal.acme.com");
 
     assertThat(list.findParentsOf("some-one.internal.acme.com")).isEmpty();
@@ -288,11 +278,11 @@ public class DomainServiceTest {
     domainSrv.solveProblem("/domains1.txt", "/domains2.txt", "/domains3.txt");
   }
 
-  private List<DomainService.NamedSource> listSourceOf(String... lines) {
+  private List<NamedSource> listSourceOf(String... lines) {
     return Arrays.asList(sourceOf(Paths.get("source"), lines));
   }
 
-  private DomainService.NamedSource sourceOf(Path path, String... lines) {
-    return DomainService.NamedSources.of(path, Arrays.asList(lines));
+  private NamedSource sourceOf(Path path, String... lines) {
+    return NamedSources.of(path, Arrays.asList(lines));
   }
 }
