@@ -42,7 +42,7 @@ public class DomainService {
           .filter(s -> !s.isEmpty()) // skip blank lines
           .filter(s -> !s.startsWith(".")) // make sure there is no malformed domains
           .map(domainName -> Domain.of(domainName, source.name()))
-          .forEach(currentDomain -> mergeIntoDomains(topDomains, currentDomain));
+          .forEach(currentDomain -> mergeDomain(topDomains, currentDomain));
     }
 
     return topDomains;
@@ -77,22 +77,32 @@ public class DomainService {
     return list;
   }
 
-  private void mergeIntoDomains(List<Domain> topDomains, Domain currentDomain) {
+  public List<Domain> mergeDomain(List<Domain> knownDomains, Domain newDomain) {
     // this for-loop will be very inefficient on lange number of domains
     // should be replaced with a more efficient method, like tree-search or hashing
-    for (int i = 0; i < topDomains.size(); i++) {
-      Domain d = topDomains.get(i);
-      if (d.isSubDomainOf(currentDomain)) {
-        currentDomain.addSubDomain(d);
-        topDomains.set(i, currentDomain);
-        return;
-      } else if (currentDomain.isSubDomainOf(d)) {
-        d.addSubDomain(currentDomain);
-        return;
+
+    boolean matchFound = false;
+    List<Domain> allSubDomainsOfNewDomain = new ArrayList<>();
+    for (int i = knownDomains.size() - 1; i >= 0; i--) {
+      Domain d = knownDomains.get(i);
+      if (d.getDomainName().equals(newDomain.getDomainName())) {
+        return knownDomains; // nothing to do - newDomain is a duplicate of existing one
+      } else if (d.isSubDomainOf(newDomain)) {
+        knownDomains.remove(i);
+        allSubDomainsOfNewDomain.add(d);
+      } else if (newDomain.isSubDomainOf(d)) {
+        mergeDomain(d.getSubDomains(), newDomain);
+        matchFound = true;
       }
     }
 
-    topDomains.add(currentDomain);
+    if (!matchFound) {
+      knownDomains.add(newDomain);
+    }
+    for (Domain subDomain : allSubDomainsOfNewDomain) {
+      mergeDomain(newDomain.getSubDomains(), subDomain);
+    }
+    return knownDomains;
   }
 
   /** NamedSource - and abstraction over files or resources (for testing) containing text lines */
@@ -191,9 +201,9 @@ public class DomainService {
 
     private final Path sourceLocation;
 
-    private final Set<Domain> subDomains;
+    private final List<Domain> subDomains;
 
-    Domain(String domainName, Path sourceLocation, Set<Domain> subDomains) {
+    Domain(String domainName, Path sourceLocation, List<Domain> subDomains) {
       this.domainName = Objects.requireNonNull(domainName);
       this.sourceLocation = sourceLocation;
       this.subDomains = subDomains;
@@ -206,7 +216,7 @@ public class DomainService {
 
     /** @return domain w/o sub-domains from a location */
     public static Domain of(String domainName, Path path) {
-      return of(domainName, path, Collections.emptyList());
+      return of(domainName, path, new ArrayList<>(0));
     }
 
     /**
@@ -219,7 +229,7 @@ public class DomainService {
       // if we aim to support IDN's, then probably usage of toLowerCase() should be
       // reconsidered
       return new Domain(
-          domainName.toLowerCase(), path, new LinkedHashSet<>(subDomains)); // preserve-order
+          domainName.toLowerCase(), path, new ArrayList<>(subDomains)); // preserve-order
     }
 
     public String getDomainName() {
@@ -230,14 +240,15 @@ public class DomainService {
       return sourceLocation;
     }
 
-    public Set<Domain> getSubDomains() {
-      return Collections.unmodifiableSet(subDomains);
+    public List<Domain> getSubDomains() {
+      return subDomains;
     }
 
     public boolean isSubDomainOf(Domain domain) {
       return isSubDomainOf(domain.getDomainName());
     }
 
+    /** @return true if supposedParent is a parent domain of this domain */
     public boolean isSubDomainOf(String supposedParent) {
       return this.domainName.length() > supposedParent.length()
           // there MUST be a point just before parent domain
