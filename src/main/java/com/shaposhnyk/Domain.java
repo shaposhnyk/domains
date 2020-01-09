@@ -18,12 +18,13 @@ public class Domain {
 
   private final Path sourceLocation;
 
-  private final List<Domain> subDomains;
+  private final DomainList subDomains;
 
   Domain(String domainName, Path sourceLocation, List<Domain> subDomains) {
     this.domainName = Objects.requireNonNull(domainName);
     this.sourceLocation = sourceLocation;
-    this.subDomains = subDomains;
+    this.subDomains = new DomainListMap();
+    subDomains.forEach(this.subDomains::addDomain);
   }
 
   // @VisibleForTesting
@@ -63,7 +64,7 @@ public class Domain {
 
   public List<Domain> getSubDomains() {
     // it would be good to retourn here Collections.unmodifiableList(), if possible
-    return subDomains;
+    return subDomains.getDomains();
   }
 
   public boolean isSubDomainOf(Domain domain) {
@@ -79,11 +80,11 @@ public class Domain {
   }
 
   public void addSubDomain(Domain d) {
-    this.subDomains.add(d);
+    this.subDomains.mergeDomain(d);
   }
 
   public boolean hasSubDomains() {
-    return !this.subDomains.isEmpty();
+    return !this.subDomains.getDomains().isEmpty();
   }
 
   @Override
@@ -110,6 +111,6 @@ public class Domain {
   }
 
   public void mergeDomain(Domain newDomain) {
-    new DomainListBruteForce(subDomains).mergeDomain(newDomain);
+    this.subDomains.mergeDomain(newDomain);
   }
 }
