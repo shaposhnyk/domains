@@ -84,7 +84,7 @@ public class Domain {
   }
 
   public boolean hasSubDomains() {
-    return !this.subDomains.getDomains().isEmpty();
+    return !this.subDomains.isEmpty();
   }
 
   @Override

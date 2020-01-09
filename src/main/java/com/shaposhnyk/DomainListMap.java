@@ -88,6 +88,17 @@ public class DomainListMap implements DomainList {
   }
 
   @Override
+  public boolean contains(Domain domain) {
+    return domainsBySuffix.getOrDefault(domain.getDomainName(), new HashSet<>()).stream()
+        .anyMatch(d -> d.getDomainName().equals(domain.getDomainName()));
+  }
+
+  @Override
+  public boolean isEmpty() {
+    return knownDomains.isEmpty();
+  }
+
+  @Override
   public String toString() {
     return knownDomains.toString();
   }

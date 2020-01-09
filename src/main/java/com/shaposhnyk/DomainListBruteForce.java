@@ -40,6 +40,16 @@ public class DomainListBruteForce implements DomainList {
   }
 
   @Override
+  public boolean contains(Domain domain) {
+    return knownDomains.stream().anyMatch(d -> d.getDomainName().equals(domain.getDomainName()));
+  }
+
+  @Override
+  public boolean isEmpty() {
+    return knownDomains.isEmpty();
+  }
+
+  @Override
   public String toString() {
     return knownDomains.toString();
   }

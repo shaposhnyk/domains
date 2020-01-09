@@ -13,12 +13,16 @@ public interface DomainList {
 
   List<Domain> getDomains();
 
+  boolean contains(Domain domain);
+
+  boolean isEmpty();
+
   /**
    * Modifies input lists, removing from it all subDomains of a newDomain OR adding newDomain as
    * subDomain to the one of existing domains
    */
   default List<Domain> mergeDomain(Domain newDomain) {
-    if (getDomains().contains(newDomain)) { // skip duplicates
+    if (contains(newDomain)) { // skip duplicates
       return getDomains();
     }
 
